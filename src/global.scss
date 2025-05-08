@@ -35,3 +35,25 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import "@ionic/angular/css/palettes/dark.system.css";
+
+.attendance-alert {
+  .alert-wrapper {
+    --min-width: 320px;
+  }
+
+  .alert-head {
+    text-align: center;
+    color: var(--ion-color-primary);
+  }
+
+  .alert-message {
+    text-align: center;
+    font-size: 1.2em;
+    color: var(--ion-color-dark);
+  }
+
+  .alert-button {
+    text-transform: uppercase;
+    font-weight: bold;
+  }
+}

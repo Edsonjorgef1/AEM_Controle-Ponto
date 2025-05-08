@@ -1,0 +1,143 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Relatório de Presenças</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-grid>
+    <ion-row>
+      <ion-col size="6">
+        <ion-item>
+          <ion-label position="stacked">Selecione o Mês</ion-label>
+          <ion-datetime
+            display-format="MMMM YYYY"
+            picker-format="MMMM YYYY"
+            locale="pt-BR"
+            [value]="selectedDate"
+            (ionChange)="onMonthChange($event)"
+            [max]="maxDate"
+            [min]="minDate"
+            monthNames="Janeiro, Fevereiro, Março, Abril, Maio, Junho, Julho, Agosto, Setembro, Outubro, Novembro, Dezembro"
+            cancelText="Cancelar"
+            doneText="Selecionar"
+            mode="ios">
+          </ion-datetime>
+        </ion-item>
+      </ion-col>
+      <ion-col size="6">
+        <ion-item>
+          <ion-label position="stacked">Funcionário</ion-label>
+          <ion-select [(ngModel)]="selectedEmployee" (ionChange)="onEmployeeChange()">
+            <ion-select-option value="">Todos</ion-select-option>
+            <ion-select-option *ngFor="let employee of employees" [value]="employee.id">
+              {{ employee.name }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+
+  <!-- Resumo Geral -->
+  <ion-card *ngIf="!selectedEmployee">
+    <ion-card-header>
+      <ion-card-title>Resumo Geral do Mês</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-grid>
+        <ion-row>
+          <ion-col size="4">
+            <div class="stat-box">
+              <div class="stat-value">{{ getTotalWorkDays() }}</div>
+              <div class="stat-label">Dias Úteis</div>
+            </div>
+          </ion-col>
+          <ion-col size="4">
+            <div class="stat-box">
+              <div class="stat-value">{{ getTotalLateDays() }}</div>
+              <div class="stat-label">Atrasos</div>
+            </div>
+          </ion-col>
+          <ion-col size="4">
+            <div class="stat-box">
+              <div class="stat-value">{{ getTotalAbsences() }}</div>
+              <div class="stat-label">Faltas</div>
+            </div>
+          </ion-col>
+        </ion-row>
+      </ion-grid>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Relatórios Individuais -->
+  <ion-card *ngFor="let report of monthlyReports">
+    <ion-card-header>
+      <ion-card-subtitle>{{ report.employeeName }}</ion-card-subtitle>
+      <ion-card-title>Relatório Individual</ion-card-title>
+    </ion-card-header>
+
+    <ion-card-content>
+      <ion-grid>
+        <ion-row>
+          <ion-col size="6">
+            <ion-item lines="none">
+              <ion-label>
+                <h3>Presenças</h3>
+                <p>{{ report.totalWorkDays }} dias</p>
+              </ion-label>
+            </ion-item>
+          </ion-col>
+          <ion-col size="6">
+            <ion-item lines="none">
+              <ion-label>
+                <h3>Atrasos</h3>
+                <p>{{ report.totalLateDays }} dias</p>
+              </ion-label>
+            </ion-item>
+          </ion-col>
+        </ion-row>
+
+        <ion-row>
+          <ion-col size="12">
+            <ion-item lines="none">
+              <ion-label>
+                <h3>Total de Atrasos</h3>
+                <p>{{ formatHours(report.totalLateMinutes) }}</p>
+              </ion-label>
+            </ion-item>
+          </ion-col>
+        </ion-row>
+
+        <!-- Timeline de Registros -->
+        <ion-row>
+          <ion-col>
+            <h3 class="ion-padding-top">Registros Diários</h3>
+            <ion-list>
+              <ion-item *ngFor="let record of report.attendanceRecords">
+                <ion-label>
+                  <h2>{{ record.date | date:'dd/MM/yyyy' }}</h2>
+                  <p>
+                    <ion-badge color="primary" *ngIf="!record.check_out">Entrada: {{ record.check_in }}</ion-badge>
+                    <ion-badge color="warning" *ngIf="record.check_in && !record.check_out">Em exercício</ion-badge>
+                    <ion-badge color="success" *ngIf="record.check_out">
+                      Entrada: {{ record.check_in }} - Saída: {{ record.check_out }}
+                    </ion-badge>
+                  </p>
+                  <ion-text *ngIf="record.late_minutes" [color]="record.late_minutes > 0 ? 'danger' : 'success'">
+                    <p>{{ record.late_minutes > 0 ? 'Atraso: ' + record.late_minutes + ' min' : 'No horário' }}</p>
+                  </ion-text>
+                </ion-label>
+                <ion-badge slot="end" [color]="getStatusColor(record.status)">
+                  {{ record.status }}
+                </ion-badge>
+              </ion-item>
+            </ion-list>
+          </ion-col>
+        </ion-row>
+      </ion-grid>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-loading [isOpen]="isLoading" message="Gerando relatório..."></ion-loading>
+</ion-content>

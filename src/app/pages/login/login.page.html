@@ -1,0 +1,35 @@
+<ion-content class="ion-padding">
+  <div class="login-container">
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Login</ion-card-title>
+      </ion-card-header>
+
+      <ion-card-content>
+        <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+          <ion-item>
+            <ion-label position="floating">Email</ion-label>
+            <ion-input type="email" formControlName="email"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Senha</ion-label>
+            <ion-input type="password" formControlName="password"></ion-input>
+          </ion-item>
+
+          <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isLoading">
+            <ion-icon name="log-in-outline" slot="start"></ion-icon>
+            Entrar
+          </ion-button>
+
+          <!-- Apenas para primeira configuração -->
+          <ion-button expand="block" color="secondary" (click)="registerAdmin()" [disabled]="isLoading">
+            <ion-icon name="person-add-outline" slot="start"></ion-icon>
+            Registrar Admin
+          </ion-button>
+        </form>
+      </ion-card-content>
+    </ion-card>
+  </div>
+  <!-- <ion-loading [isOpen]="isLoading" message="Entrando..."></ion-loading> -->
+</ion-content>

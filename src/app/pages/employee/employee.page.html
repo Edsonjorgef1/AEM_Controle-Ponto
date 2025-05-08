@@ -1,0 +1,58 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Cadastro de Funcionários</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="employeeForm" (ngSubmit)="onSubmit()">
+    <ion-list>
+      <ion-item>
+        <ion-label position="floating">Nome</ion-label>
+        <ion-input type="text" formControlName="name"></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-label position="floating">Cargo</ion-label>
+        <ion-input type="text" formControlName="position"></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-label position="floating">Departamento</ion-label>
+        <ion-select formControlName="department">
+          <ion-select-option *ngFor="let dept of departments" [value]="dept">
+            {{ dept }}
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
+    </ion-list>
+
+    <ion-button expand="block" type="submit" [disabled]="!employeeForm.valid || isLoading">
+      <ion-icon name="save-outline" slot="start"></ion-icon>
+      Cadastrar
+    </ion-button>
+  </form>
+
+  <ion-list class="ion-margin-top">
+    <ion-list-header>
+      <ion-label>Funcionários Cadastrados</ion-label>
+    </ion-list-header>
+
+    <ion-item *ngFor="let employee of employees">
+      <ion-label>
+        <h2>{{ employee.name }}</h2>
+        <p>{{ employee.position }}</p>
+        <p>Código: {{ employee.internal_code }}</p>
+      </ion-label>
+      <ion-note slot="end" color="medium">{{ employee.department }}</ion-note>
+    </ion-item>
+
+    <ion-item *ngIf="employees.length === 0">
+      <ion-label color="medium" class="ion-text-center">
+        Nenhum funcionário cadastrado
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <ion-loading [isOpen]="isLoading" message="Carregando..."></ion-loading>
+</ion-content>
