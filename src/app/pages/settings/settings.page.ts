@@ -1,128 +1,245 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
-import { EmployeeService } from '../../services/employee.service';
+import { FormsModule } from '@angular/forms';
+import { AlertController, IonicModule, ToastController } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { addOutline, closeOutline, keyOutline, saveOutline, timeOutline, trashOutline } from 'ionicons/icons';
+import { ApiService } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
+import { apiErrorMessage } from '../../core/auth.interceptor';
+import { Category, WorkSchedule } from '../../core/models';
+
+const WEEKDAYS = [
+  { value: 1, label: 'Segunda' },
+  { value: 2, label: 'Terça' },
+  { value: 3, label: 'Quarta' },
+  { value: 4, label: 'Quinta' },
+  { value: 5, label: 'Sexta' },
+  { value: 6, label: 'Sábado' },
+  { value: 7, label: 'Domingo' },
+];
 
 @Component({
   selector: 'app-settings',
-  template: `
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>Configurações</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content class="ion-padding">
-      <form [formGroup]="scheduleForm" (ngSubmit)="onSubmit()">
-        <ion-list>
-          <ion-item>
-            <ion-label position="stacked">Horário de Início</ion-label>
-            <ion-input
-              type="time"
-              formControlName="start_time"
-              placeholder="08:00">
-            </ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="stacked">Horário de Término</ion-label>
-            <ion-input
-              type="time"
-              formControlName="end_time"
-              placeholder="16:00">
-            </ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label>Dias de Trabalho</ion-label>
-            <ion-select multiple="true" formControlName="work_days">
-              <ion-select-option value="1">Segunda</ion-select-option>
-              <ion-select-option value="2">Terça</ion-select-option>
-              <ion-select-option value="3">Quarta</ion-select-option>
-              <ion-select-option value="4">Quinta</ion-select-option>
-              <ion-select-option value="5">Sexta</ion-select-option>
-              <ion-select-option value="6">Sábado</ion-select-option>
-              <ion-select-option value="7">Domingo</ion-select-option>
-            </ion-select>
-          </ion-item>
-        </ion-list>
-
-        <ion-button expand="block" type="submit" [disabled]="!scheduleForm.valid || isLoading">
-          <ion-icon name="save-outline" slot="start"></ion-icon>
-          Salvar Configurações
-        </ion-button>
-      </form>
-
-      <ion-loading [isOpen]="isLoading" message="Salvando..."></ion-loading>
-    </ion-content>
-  `,
   standalone: true,
-  imports: [CommonModule, IonicModule, ReactiveFormsModule]
+  imports: [CommonModule, FormsModule, IonicModule],
+  templateUrl: './settings.page.html',
+  styleUrls: ['./settings.page.scss'],
 })
 export class SettingsPage implements OnInit {
-  scheduleForm: FormGroup;
-  isLoading = false;
+  private api = inject(ApiService);
+  private toast = inject(ToastController);
+  private alerts = inject(AlertController);
+  readonly auth = inject(AuthService);
 
-  constructor(
-    private formBuilder: FormBuilder,
-    private employeeService: EmployeeService,
-    private toastController: ToastController
-  ) {
-    this.scheduleForm = this.formBuilder.group({
-      start_time: ['08:00', Validators.required],
-      end_time: ['16:00', Validators.required],
-      work_days: [[1,2,3,4,5], Validators.required]
-    });
+  readonly weekdays = WEEKDAYS;
+  readonly schedules = signal<WorkSchedule[]>([]);
+  readonly categories = signal<Category[]>([]);
+  readonly loading = signal(true);
+  readonly saving = signal(false);
+
+  readonly scheduleOpen = signal(false);
+  readonly editingGlobal = signal(false);
+  schedule: WorkSchedule = this.emptySchedule();
+
+  readonly categoryOpen = signal(false);
+  categoryForm = { name: '', code_prefix: '', description: '', color: 'primary' };
+
+  readonly passwordOpen = signal(false);
+  passwordForm = { current: '', next: '', confirm: '' };
+
+  constructor() {
+    addIcons({ addOutline, closeOutline, keyOutline, saveOutline, timeOutline, trashOutline });
   }
 
-  async ngOnInit() {
-    await this.loadCurrentSchedule();
+  ngOnInit(): void {
+    void this.load();
   }
 
-  async loadCurrentSchedule() {
+  private emptySchedule(): WorkSchedule {
+    return {
+      category_id: null,
+      start_time: '08:00',
+      end_time: '16:00',
+      tolerance_minutes: 10,
+      work_days: [1, 2, 3, 4, 5],
+    };
+  }
+
+  async load(event?: CustomEvent): Promise<void> {
+    this.loading.set(true);
     try {
-      this.isLoading = true;
-      const schedule = await this.employeeService.getWorkSchedule();
-      this.scheduleForm.patchValue({
-        start_time: schedule.start_time,
-        end_time: schedule.end_time,
-        work_days: schedule.work_days.map(day => day.toString())
-      });
+      const [schedules, categories] = await Promise.all([this.api.schedules(), this.api.categories()]);
+      this.schedules.set(schedules);
+      this.categories.set(categories);
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
-      this.showToast('Erro ao carregar configurações', 'danger');
+      await this.notify(apiErrorMessage(error, 'Não foi possível carregar as configurações'), 'danger');
     } finally {
-      this.isLoading = false;
+      this.loading.set(false);
+      (event?.target as HTMLIonRefresherElement | undefined)?.complete();
     }
   }
 
-  async onSubmit() {
-    if (this.scheduleForm.valid) {
-      try {
-        this.isLoading = true;
-        await this.employeeService.setWorkSchedule({
-          start_time: this.scheduleForm.value.start_time,
-          end_time: this.scheduleForm.value.end_time,
-          work_days: this.scheduleForm.value.work_days.map(Number)
-        });
-        this.showToast('Configurações salvas com sucesso!', 'success');
-      } catch (error) {
-        console.error('Erro ao salvar:', error);
-        this.showToast('Erro ao salvar configurações', 'danger');
-      } finally {
-        this.isLoading = false;
-      }
+  get globalSchedule(): WorkSchedule | undefined {
+    return this.schedules().find((s) => s.category_id === null);
+  }
+
+  get categorySchedules(): WorkSchedule[] {
+    return this.schedules().filter((s) => s.category_id !== null);
+  }
+
+  /** Categorias que ainda não têm horário próprio. */
+  get categoriesWithoutSchedule(): Category[] {
+    const used = new Set(this.categorySchedules.map((s) => s.category_id));
+    return this.categories().filter((c) => !used.has(c.id));
+  }
+
+  openSchedule(existing?: WorkSchedule, global = false): void {
+    this.editingGlobal.set(global);
+    this.schedule = existing
+      ? {
+          ...existing,
+          start_time: existing.start_time.slice(0, 5),
+          end_time: existing.end_time.slice(0, 5),
+          work_days: [...existing.work_days],
+        }
+      : { ...this.emptySchedule(), category_id: global ? null : this.categoriesWithoutSchedule[0]?.id ?? null };
+    this.scheduleOpen.set(true);
+  }
+
+  toggleDay(day: number): void {
+    const days = this.schedule.work_days;
+    this.schedule.work_days = days.includes(day)
+      ? days.filter((d) => d !== day)
+      : [...days, day].sort((a, b) => a - b);
+  }
+
+  async saveSchedule(): Promise<void> {
+    if (!this.schedule.work_days.length) {
+      await this.notify('Escolha pelo menos um dia de trabalho', 'danger');
+      return;
+    }
+    if (this.schedule.start_time >= this.schedule.end_time) {
+      await this.notify('A hora de saída deve ser posterior à de entrada', 'danger');
+      return;
+    }
+
+    this.saving.set(true);
+    try {
+      await this.api.saveSchedule({
+        ...this.schedule,
+        category_id: this.editingGlobal() ? null : this.schedule.category_id,
+      });
+      await this.notify('Horário guardado', 'success');
+      this.scheduleOpen.set(false);
+      await this.load();
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível guardar o horário'), 'danger');
+    } finally {
+      this.saving.set(false);
     }
   }
 
-  private async showToast(message: string, color: string) {
-    const toast = await this.toastController.create({
-      message,
-      duration: 2000,
-      color,
-      position: 'middle'
+  async removeSchedule(item: WorkSchedule): Promise<void> {
+    const alert = await this.alerts.create({
+      header: 'Remover horário',
+      message: `A categoria ${item.category_name} passa a seguir o horário geral.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Remover',
+          role: 'destructive',
+          handler: () => {
+            void this.doRemoveSchedule(item);
+          },
+        },
+      ],
     });
+    await alert.present();
+  }
+
+  private async doRemoveSchedule(item: WorkSchedule): Promise<void> {
+    try {
+      await this.api.deleteSchedule(item.category_id!);
+      await this.load();
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível remover'), 'danger');
+    }
+  }
+
+  dayLabels(days: number[]): string {
+    return days.map((d) => WEEKDAYS.find((w) => w.value === d)?.label.slice(0, 3)).join(', ');
+  }
+
+  // ---- Categorias ------------------------------------------------------------
+  openCategory(): void {
+    this.categoryForm = { name: '', code_prefix: '', description: '', color: 'primary' };
+    this.categoryOpen.set(true);
+  }
+
+  async saveCategory(): Promise<void> {
+    const name = this.categoryForm.name.trim();
+    const prefix = this.categoryForm.code_prefix.trim().toUpperCase();
+
+    if (name.length < 2 || !/^[A-Z]{2,5}$/.test(prefix)) {
+      await this.notify('Indique o nome e um prefixo de 2 a 5 letras (ex.: EST)', 'danger');
+      return;
+    }
+
+    this.saving.set(true);
+    try {
+      await this.api.createCategory({
+        name,
+        code_prefix: prefix,
+        description: this.categoryForm.description.trim() || null,
+        color: this.categoryForm.color,
+      });
+      await this.notify('Categoria criada', 'success');
+      this.categoryOpen.set(false);
+      await this.load();
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível criar a categoria'), 'danger');
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async deleteCategory(category: Category): Promise<void> {
+    try {
+      await this.api.deleteCategory(category.id);
+      await this.notify('Categoria eliminada', 'success');
+      await this.load();
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível eliminar'), 'danger');
+    }
+  }
+
+  // ---- Palavra-passe ---------------------------------------------------------
+  async changePassword(): Promise<void> {
+    if (this.passwordForm.next.length < 6) {
+      await this.notify('A nova palavra-passe deve ter pelo menos 6 caracteres', 'danger');
+      return;
+    }
+    if (this.passwordForm.next !== this.passwordForm.confirm) {
+      await this.notify('A confirmação não coincide', 'danger');
+      return;
+    }
+
+    this.saving.set(true);
+    try {
+      await this.auth.changePassword(this.passwordForm.current, this.passwordForm.next);
+      await this.notify('Palavra-passe actualizada', 'success');
+      this.passwordOpen.set(false);
+      this.passwordForm = { current: '', next: '', confirm: '' };
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível alterar a palavra-passe'), 'danger');
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  private async notify(message: string, color: 'success' | 'danger'): Promise<void> {
+    const toast = await this.toast.create({ message, duration: 2600, color });
     await toast.present();
   }
 }

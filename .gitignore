@@ -68,3 +68,8 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Servidor (API)
+/server/node_modules
+/server/.env
+.env

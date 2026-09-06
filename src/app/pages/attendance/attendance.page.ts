@@ -1,138 +1,186 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
-import { Employee, Attendance } from '../../models/employee.model';
-import { EmployeeService } from '../../services/employee.service';
-import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { AlertController, IonicModule, ToastController } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { addOutline, closeOutline, refreshOutline, saveOutline, trashOutline } from 'ionicons/icons';
+import { ApiService } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
+import { apiErrorMessage } from '../../core/auth.interceptor';
+import { AttendanceRecord, Category, Member } from '../../core/models';
+
+/** "YYYY-MM-DD" na hora local — evita o desvio do toISOString() em UTC. */
+function isoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function today(): string {
+  return isoDate(new Date());
+}
 
 @Component({
   selector: 'app-attendance',
+  standalone: true,
+  imports: [CommonModule, FormsModule, IonicModule],
   templateUrl: './attendance.page.html',
   styleUrls: ['./attendance.page.scss'],
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, IonicModule]
 })
 export class AttendancePage implements OnInit {
-  attendanceForm: FormGroup;
-  employees: Employee[] = [];
-  todayAttendance: Attendance[] = [];
-  isLoading = false;
-  loadError = false;
+  private api = inject(ApiService);
+  private toast = inject(ToastController);
+  private alerts = inject(AlertController);
+  readonly auth = inject(AuthService);
 
-  constructor(
-    private formBuilder: FormBuilder,
-    private employeeService: EmployeeService,
-    private toastController: ToastController,
-    private router: Router
-  ) {
-    this.attendanceForm = this.formBuilder.group({
-      employee_id: ['', Validators.required],
-      date: [new Date().toISOString(), Validators.required],
-      check_in: [new Date().toTimeString().substring(0, 5), Validators.required],
-      status: ['Presente', Validators.required],
-      observations: [''],
-      auth_method: ['code']
-    });
+  readonly records = signal<AttendanceRecord[]>([]);
+  readonly categories = signal<Category[]>([]);
+  readonly members = signal<Member[]>([]);
+  readonly loading = signal(true);
+  readonly saving = signal(false);
+
+  from = today();
+  to = today();
+  categoryFilter: number | null = null;
+
+  readonly manualOpen = signal(false);
+  manual = {
+    member_id: '',
+    work_date: today(),
+    check_in: '',
+    check_out: '',
+    status: 'No horário' as AttendanceRecord['status'],
+    notes: '',
+  };
+
+  readonly statuses: AttendanceRecord['status'][] = ['No horário', 'Atrasado', 'Ausente', 'Justificado'];
+
+  constructor() {
+    addIcons({ addOutline, closeOutline, refreshOutline, saveOutline, trashOutline });
   }
 
-  async ngOnInit() {
-    await this.loadEmployees();
-    await this.loadTodayAttendance();
+  ngOnInit(): void {
+    void this.load();
+    void this.loadReferences();
   }
 
-  async loadInitialData() {
-    this.isLoading = true;
-    this.loadError = false;
-    
+  private async loadReferences(): Promise<void> {
     try {
-      await Promise.all([
-        this.loadEmployees(),
-        this.loadTodayAttendance()
-      ]);
+      const [categories, members] = await Promise.all([this.api.categories(), this.api.members({ active: true })]);
+      this.categories.set(categories);
+      this.members.set(members.items);
     } catch (error) {
-      console.error('Erro ao carregar dados iniciais:', error);
-      this.loadError = true;
-      this.showToast('Erro ao carregar dados', 'danger');
+      console.error('[registos] falha a carregar dados de apoio:', error);
+    }
+  }
+
+  async load(event?: CustomEvent): Promise<void> {
+    this.loading.set(true);
+    try {
+      const page = await this.api.attendance({
+        from: this.from,
+        to: this.to,
+        category_id: this.categoryFilter,
+      });
+      this.records.set(page.items);
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível carregar os registos'), 'danger');
     } finally {
-      this.isLoading = false;
+      this.loading.set(false);
+      (event?.target as HTMLIonRefresherElement | undefined)?.complete();
     }
   }
 
-  async retry() {
-    await this.loadInitialData();
+  /** Atalhos de período usados no dia-a-dia. */
+  setRange(range: 'hoje' | 'semana' | 'mes'): void {
+    const now = new Date();
+    if (range === 'hoje') {
+      this.from = this.to = today();
+    } else if (range === 'semana') {
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      this.from = isoDate(monday);
+      this.to = today();
+    } else {
+      this.from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      this.to = today();
+    }
+    void this.load();
   }
 
-  async loadEmployees() {
+  openManual(): void {
+    this.manual = {
+      member_id: '', work_date: today(), check_in: '',
+      check_out: '', status: 'No horário', notes: '',
+    };
+    this.manualOpen.set(true);
+  }
+
+  async saveManual(): Promise<void> {
+    if (!this.manual.member_id) {
+      await this.notify('Escolha a pessoa', 'danger');
+      return;
+    }
+
+    this.saving.set(true);
     try {
-      this.isLoading = true;
-      this.employees = await this.employeeService.getEmployees();
-      
-      if (this.employees.length === 0) {
-        this.showToast('Nenhum funcionário cadastrado. Cadastre funcionários primeiro.', 'warning');
-        await this.router.navigate(['/employee']); // Redireciona para página de cadastro
-        return;
-      }
+      await this.api.manualAttendance({
+        member_id: this.manual.member_id,
+        work_date: this.manual.work_date,
+        check_in: this.manual.check_in || null,
+        check_out: this.manual.check_out || null,
+        status: this.manual.status,
+        notes: this.manual.notes.trim() || null,
+      });
+      await this.notify('Registo guardado', 'success');
+      this.manualOpen.set(false);
+      await this.load();
     } catch (error) {
-      console.error('Erro ao carregar funcionários:', error);
-      this.showToast('Erro ao carregar funcionários', 'danger');
+      await this.notify(apiErrorMessage(error, 'Não foi possível guardar o registo'), 'danger');
     } finally {
-      this.isLoading = false;
+      this.saving.set(false);
     }
   }
 
-  async loadTodayAttendance() {
-    if (this.employees.length === 0) return; // Não carrega presenças se não há funcionários
-
-    try {
-      const today = new Date();
-      const attendanceData = await this.employeeService.getAttendanceByMonth(
-        today.getFullYear(),
-        today.getMonth() + 1
-      );
-
-      this.todayAttendance = attendanceData.filter(record => 
-        new Date(record.date).toDateString() === today.toDateString()
-      );
-    } catch (error) {
-      console.error('Erro ao carregar presenças:', error);
-      this.showToast('Erro ao carregar registros de presença', 'danger');
-    }
-  }
-
-  async onSubmit() {
-    if (this.attendanceForm.valid) {
-      try {
-        const formValue = this.attendanceForm.value;
-        await this.employeeService.registerAttendance(
-          formValue.employee_id,
-          formValue.auth_method
-        );
-        this.showToast('Presença registrada com sucesso', 'success');
-        this.attendanceForm.reset({
-          date: new Date().toISOString(),
-          status: 'Presente',
-          auth_method: 'code'
-        });
-        this.loadTodayAttendance();
-      } catch (error) {
-        this.showToast('Erro ao registrar presença', 'danger');
-      }
-    }
-  }
-
-  getEmployeeName(id: string): string {
-    const employee = this.employees.find(emp => emp.id === id);
-    return employee ? employee.name : 'Funcionário não encontrado';
-  }
-
-  private async showToast(message: string, color: string) {
-    const toast = await this.toastController.create({
-      message,
-      duration: 3000,
-      color,
-      position: 'middle'
+  async confirmDelete(record: AttendanceRecord): Promise<void> {
+    const alert = await this.alerts.create({
+      header: 'Eliminar registo',
+      message: `Eliminar o registo de ${record.full_name} em ${record.work_date}?`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Eliminar',
+          role: 'destructive',
+          handler: () => {
+            void this.remove(record);
+          },
+        },
+      ],
     });
-    toast.present();
+    await alert.present();
   }
+
+  private async remove(record: AttendanceRecord): Promise<void> {
+    try {
+      await this.api.deleteAttendance(record.id);
+      await this.notify('Registo eliminado', 'success');
+      await this.load();
+    } catch (error) {
+      await this.notify(apiErrorMessage(error, 'Não foi possível eliminar'), 'danger');
+    }
+  }
+
+  statusColor(status: AttendanceRecord['status']): string {
+    switch (status) {
+      case 'No horário': return 'success';
+      case 'Atrasado': return 'warning';
+      case 'Justificado': return 'tertiary';
+      default: return 'danger';
+    }
+  }
+
+  private async notify(message: string, color: 'success' | 'danger'): Promise<void> {
+    const toast = await this.toast.create({ message, duration: 2600, color });
+    await toast.present();
+  }
+
+  trackById = (_: number, item: AttendanceRecord) => item.id;
 }

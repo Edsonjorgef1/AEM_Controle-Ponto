@@ -1,0 +1,36 @@
+.users-content {
+  --background: var(--ion-color-light);
+}
+
+.legend {
+  margin: 12px;
+
+  p {
+    margin: 0 0 6px;
+    font-size: 0.8rem;
+    color: var(--ion-color-medium-shade);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.skeletons {
+  padding: 12px;
+
+  ion-skeleton-text {
+    height: 62px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+}
+
+ion-item.inactive {
+  opacity: 0.55;
+}
+
+.inactive-tag {
+  color: var(--ion-color-danger);
+  font-size: 0.75rem;
+}

@@ -1,48 +1,294 @@
 <ion-header>
-  <ion-toolbar>
-    <ion-title>Configurações de Horário</ion-title>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Configurações</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <form [formGroup]="scheduleForm" (ngSubmit)="onSubmit()">
-    <ion-list>
-      <ion-item>
-        <ion-label position="floating">Horário de Início</ion-label>
-        <ion-datetime
-          formControlName="startTime"
-          display-format="HH:mm"
-          picker-format="HH:mm">
-        </ion-datetime>
+<ion-content class="settings-content">
+  <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <!-- Horário geral -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Horário geral</ion-card-title>
+      <ion-card-subtitle>Aplica-se a todas as categorias sem horário próprio</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ng-container *ngIf="globalSchedule as g">
+        <div class="schedule-line">
+          <ion-icon name="time-outline"></ion-icon>
+          <span>{{ g.start_time.slice(0, 5) }} — {{ g.end_time.slice(0, 5) }}</span>
+          <ion-badge color="medium">{{ g.tolerance_minutes }} min de tolerância</ion-badge>
+        </div>
+        <p class="days">{{ dayLabels(g.work_days) }}</p>
+      </ng-container>
+      <p class="days" *ngIf="!globalSchedule">Ainda não definido.</p>
+
+      <ion-button size="small" fill="outline" (click)="openSchedule(globalSchedule, true)">
+        Editar horário geral
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Horários por categoria -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Horários por categoria</ion-card-title>
+      <ion-card-subtitle>Ex.: estudantes com horário diferente do pessoal</ion-card-subtitle>
+    </ion-card-header>
+
+    <ion-list lines="full">
+      <ion-item *ngIf="!categorySchedules.length">
+        <ion-label class="empty">Nenhuma categoria tem horário próprio.</ion-label>
       </ion-item>
 
-      <ion-item>
-        <ion-label position="floating">Horário de Término</ion-label>
-        <ion-datetime
-          formControlName="endTime"
-          display-format="HH:mm"
-          picker-format="HH:mm">
-        </ion-datetime>
-      </ion-item>
-
-      <ion-item>
-        <ion-label position="floating">Dias de Trabalho</ion-label>
-        <ion-select
-          formControlName="workDays"
-          multiple="true"
-          [compareWith]="compareWith">
-          <ion-select-option *ngFor="let day of workDays" [value]="day.id">
-            {{ day.name }}
-          </ion-select-option>
-        </ion-select>
+      <ion-item *ngFor="let s of categorySchedules">
+        <ion-label>
+          <h3>{{ s.category_name }}</h3>
+          <p>
+            {{ s.start_time.slice(0, 5) }} — {{ s.end_time.slice(0, 5) }} ·
+            {{ s.tolerance_minutes }} min de tolerância
+          </p>
+          <p>{{ dayLabels(s.work_days) }}</p>
+        </ion-label>
+        <ion-buttons slot="end">
+          <ion-button (click)="openSchedule(s)" aria-label="Editar">
+            <ion-icon slot="icon-only" name="time-outline"></ion-icon>
+          </ion-button>
+          <ion-button color="danger" (click)="removeSchedule(s)" aria-label="Remover">
+            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-item>
     </ion-list>
 
-    <ion-button expand="block" type="submit" [disabled]="!scheduleForm.valid || isLoading">
-      <ion-icon name="save-outline" slot="start"></ion-icon>
-      Salvar Configurações
-    </ion-button>
-  </form>
+    <ion-card-content>
+      <ion-button
+        size="small"
+        fill="outline"
+        [disabled]="!categoriesWithoutSchedule.length"
+        (click)="openSchedule()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Definir horário de uma categoria
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
 
-  <ion-loading [isOpen]="isLoading" message="Carregando..."></ion-loading>
+  <!-- Categorias -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Categorias de pessoas</ion-card-title>
+      <ion-card-subtitle>Funcionários, professores, estudantes e outros tipos</ion-card-subtitle>
+    </ion-card-header>
+
+    <ion-list lines="full">
+      <ion-item *ngFor="let c of categories()">
+        <ion-label>
+          <h3>{{ c.name }}</h3>
+          <p>
+            Prefixo <strong>{{ c.code_prefix }}</strong> ·
+            {{ c.members_count ?? 0 }} pessoa(s)
+          </p>
+          <p *ngIf="c.description">{{ c.description }}</p>
+        </ion-label>
+        <ion-badge slot="start" [color]="c.color">&nbsp;</ion-badge>
+        <ion-button
+          slot="end"
+          fill="clear"
+          color="danger"
+          [disabled]="!!c.members_count"
+          (click)="deleteCategory(c)"
+          aria-label="Eliminar categoria">
+          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </ion-list>
+
+    <ion-card-content>
+      <ion-button size="small" fill="outline" (click)="openCategory()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Nova categoria
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Conta -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>A minha conta</ion-card-title>
+      <ion-card-subtitle>{{ auth.user()?.name }} · {{ auth.user()?.email }}</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-button size="small" fill="outline" (click)="passwordOpen.set(true)">
+        <ion-icon slot="start" name="key-outline"></ion-icon>
+        Alterar palavra-passe
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Modal: horário -->
+  <ion-modal [isOpen]="scheduleOpen()" (didDismiss)="scheduleOpen.set(false)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editingGlobal() ? 'Horário geral' : 'Horário da categoria' }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="scheduleOpen.set(false)">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding">
+        <ion-list lines="full">
+          <ion-item *ngIf="!editingGlobal()">
+            <ion-select
+              label="Categoria *"
+              labelPlacement="stacked"
+              [(ngModel)]="schedule.category_id"
+              interface="action-sheet">
+              <ion-select-option *ngFor="let c of categories()" [value]="c.id">{{ c.name }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <ion-item>
+            <ion-input label="Entrada" labelPlacement="stacked" type="time" [(ngModel)]="schedule.start_time"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-input label="Saída" labelPlacement="stacked" type="time" [(ngModel)]="schedule.end_time"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-input
+              label="Tolerância (minutos)"
+              labelPlacement="stacked"
+              type="number"
+              min="0"
+              max="120"
+              [(ngModel)]="schedule.tolerance_minutes">
+            </ion-input>
+          </ion-item>
+        </ion-list>
+
+        <h3 class="section-title">Dias de trabalho</h3>
+        <div class="days-picker">
+          <ion-chip
+            *ngFor="let d of weekdays"
+            [outline]="!schedule.work_days.includes(d.value)"
+            [color]="schedule.work_days.includes(d.value) ? 'primary' : 'medium'"
+            (click)="toggleDay(d.value)">
+            {{ d.label }}
+          </ion-chip>
+        </div>
+
+        <p class="hint">
+          A tolerância evita marcar atraso por poucos minutos: com entrada às 08:00 e
+          10 minutos de tolerância, quem chega às 08:09 não fica atrasado.
+        </p>
+
+        <ion-button expand="block" [disabled]="saving()" (click)="saveSchedule()">
+          <ion-icon slot="start" name="save-outline"></ion-icon>
+          {{ saving() ? 'A guardar...' : 'Guardar horário' }}
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Modal: categoria -->
+  <ion-modal [isOpen]="categoryOpen()" (didDismiss)="categoryOpen.set(false)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Nova categoria</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="categoryOpen.set(false)">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding">
+        <ion-list lines="full">
+          <ion-item>
+            <ion-input label="Nome *" labelPlacement="stacked" placeholder="Estagiários" [(ngModel)]="categoryForm.name"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              label="Prefixo do código *"
+              labelPlacement="stacked"
+              placeholder="EST"
+              maxlength="5"
+              [(ngModel)]="categoryForm.code_prefix">
+            </ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Descrição" labelPlacement="stacked" [(ngModel)]="categoryForm.description"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-select label="Cor" labelPlacement="stacked" [(ngModel)]="categoryForm.color" interface="popover">
+              <ion-select-option value="primary">Azul</ion-select-option>
+              <ion-select-option value="success">Verde</ion-select-option>
+              <ion-select-option value="tertiary">Roxo</ion-select-option>
+              <ion-select-option value="warning">Amarelo</ion-select-option>
+              <ion-select-option value="danger">Vermelho</ion-select-option>
+              <ion-select-option value="medium">Cinzento</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-list>
+
+        <p class="hint">
+          O prefixo forma os códigos internos das pessoas desta categoria
+          (ex.: <strong>EST</strong> gera EST0001, EST0002...).
+        </p>
+
+        <ion-button expand="block" [disabled]="saving()" (click)="saveCategory()">
+          <ion-icon slot="start" name="save-outline"></ion-icon>
+          Criar categoria
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Modal: palavra-passe -->
+  <ion-modal [isOpen]="passwordOpen()" (didDismiss)="passwordOpen.set(false)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Alterar palavra-passe</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="passwordOpen.set(false)">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding">
+        <ion-list lines="full">
+          <ion-item>
+            <ion-input label="Palavra-passe actual" labelPlacement="stacked" type="password" [(ngModel)]="passwordForm.current"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Nova palavra-passe" labelPlacement="stacked" type="password" [(ngModel)]="passwordForm.next"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Confirmar nova" labelPlacement="stacked" type="password" [(ngModel)]="passwordForm.confirm"></ion-input>
+          </ion-item>
+        </ion-list>
+
+        <ion-button expand="block" [disabled]="saving()" (click)="changePassword()">
+          <ion-icon slot="start" name="save-outline"></ion-icon>
+          Guardar
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 </ion-content>

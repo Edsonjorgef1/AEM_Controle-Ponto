@@ -1,15 +1,17 @@
 import { bootstrapApplication } from '@angular/platform-browser';
-import { AppComponent } from './app/app.component';
 import { importProvidersFrom } from '@angular/core';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { RouteReuseStrategy, provideRouter } from '@angular/router';
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
-import { RouteReuseStrategy } from '@angular/router';
-import { provideRouter } from '@angular/router';
-import { routes } from './app/app-routing.module';
+import { AppComponent } from './app/app.component';
+import { routes } from './app/app.routes';
+import { authInterceptor } from './app/core/auth.interceptor';
 
 bootstrapApplication(AppComponent, {
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
-    importProvidersFrom(IonicModule.forRoot()),
-    provideRouter(routes)
-  ]
-}).catch(err => console.error(err));
+    importProvidersFrom(IonicModule.forRoot({ mode: 'md' })),
+    provideRouter(routes),
+    provideHttpClient(withInterceptors([authInterceptor])),
+  ],
+}).catch((err) => console.error(err));

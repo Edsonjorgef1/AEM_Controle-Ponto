@@ -1,0 +1,230 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Pessoas registadas</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="load()" aria-label="Actualizar">
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Procurar por nome, código ou turma"
+      [value]="search()"
+      (ionInput)="search.set($any($event).detail.value ?? '')">
+    </ion-searchbar>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="members-content">
+  <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="filters">
+    <ion-chip
+      [outline]="categoryFilter() !== null"
+      (click)="categoryFilter.set(null)">
+      Todas
+    </ion-chip>
+    <ion-chip
+      *ngFor="let c of categories()"
+      [color]="c.color"
+      [outline]="categoryFilter() !== c.id"
+      (click)="categoryFilter.set(c.id)">
+      {{ c.name }}
+      <ion-badge *ngIf="c.members_count">{{ c.members_count }}</ion-badge>
+    </ion-chip>
+  </div>
+
+  <ion-item lines="none" class="toggle-inactive">
+    <ion-checkbox
+      labelPlacement="end"
+      [checked]="showInactive()"
+      (ionChange)="showInactive.set($any($event).detail.checked)">
+      Mostrar também pessoas inactivas
+    </ion-checkbox>
+  </ion-item>
+
+  <div class="skeletons" *ngIf="loading() && !members().length">
+    <ion-skeleton-text animated *ngFor="let i of [1, 2, 3, 4, 5]"></ion-skeleton-text>
+  </div>
+
+  <ion-list lines="full" *ngIf="!loading() || members().length">
+    <ion-item *ngIf="!filtered().length">
+      <ion-label class="empty">Nenhuma pessoa corresponde aos filtros.</ion-label>
+    </ion-item>
+
+    <ion-item-sliding *ngFor="let m of filtered(); trackBy: trackById">
+      <ion-item [class.inactive]="!m.active">
+        <ion-label>
+          <h2>{{ m.full_name }}</h2>
+          <p>
+            <ion-badge [color]="m.category_color">{{ m.category_name }}</ion-badge>
+            <span class="code">{{ m.internal_code }}</span>
+            <span *ngIf="m.position"> · {{ m.position }}</span>
+            <span *ngIf="m.department"> · {{ m.department }}</span>
+          </p>
+          <p class="inactive-tag" *ngIf="!m.active">Inactiva — as leituras são recusadas</p>
+        </ion-label>
+
+        <ion-buttons slot="end">
+          <ion-button (click)="showQrCode(m)" aria-label="Ver QR Code">
+            <ion-icon slot="icon-only" name="qr-code-outline"></ion-icon>
+          </ion-button>
+          <ion-button *ngIf="auth.isAdmin()" (click)="openEdit(m)" aria-label="Editar">
+            <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-item>
+
+      <ion-item-options side="end" *ngIf="auth.isAdmin()">
+        <ion-item-option color="medium" (click)="toggleActive(m)">
+          {{ m.active ? 'Desactivar' : 'Activar' }}
+        </ion-item-option>
+        <ion-item-option color="danger" (click)="confirmDelete(m)">
+          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
+  </ion-list>
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end" *ngIf="auth.isAdmin()">
+    <ion-fab-button (click)="openCreate()" aria-label="Registar pessoa">
+      <ion-icon name="add-outline"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+  <!-- Formulário de registo / edição -->
+  <ion-modal [isOpen]="formOpen()" (didDismiss)="formOpen.set(false)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editing() ? 'Editar pessoa' : 'Registar pessoa' }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="formOpen.set(false)">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding">
+        <form [formGroup]="form" (ngSubmit)="save()">
+          <ion-list lines="full">
+            <ion-item>
+              <ion-input
+                label="Nome completo *"
+                labelPlacement="stacked"
+                formControlName="full_name"
+                placeholder="Ana Cossa">
+              </ion-input>
+            </ion-item>
+            <ion-note color="danger" class="field-error"
+              *ngIf="form.controls.full_name.touched && form.controls.full_name.invalid">
+              Indique o nome completo (mínimo 3 caracteres)
+            </ion-note>
+
+            <ion-item>
+              <ion-select
+                label="Categoria *"
+                labelPlacement="stacked"
+                formControlName="category_id"
+                placeholder="Escolher categoria"
+                interface="action-sheet">
+                <ion-select-option *ngFor="let c of categories()" [value]="c.id">
+                  {{ c.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-note color="danger" class="field-error"
+              *ngIf="form.controls.category_id.touched && form.controls.category_id.invalid">
+              Escolha a categoria
+            </ion-note>
+
+            <ion-item>
+              <ion-input
+                label="Cargo / disciplina"
+                labelPlacement="stacked"
+                formControlName="position"
+                placeholder="Secretária, Matemática...">
+              </ion-input>
+            </ion-item>
+
+            <ion-item>
+              <ion-input
+                label="Departamento / turma"
+                labelPlacement="stacked"
+                formControlName="department"
+                placeholder="Administração, 10ª A...">
+              </ion-input>
+            </ion-item>
+
+            <ion-item>
+              <ion-input label="Email" labelPlacement="stacked" type="email" formControlName="email"></ion-input>
+            </ion-item>
+
+            <ion-item>
+              <ion-input label="Telefone" labelPlacement="stacked" type="tel" formControlName="phone"></ion-input>
+            </ion-item>
+          </ion-list>
+
+          <p class="form-hint" *ngIf="!editing()">
+            O código interno e o QR Code são gerados automaticamente ao guardar.
+          </p>
+
+          <ion-button expand="block" type="submit" [disabled]="saving()">
+            <ion-icon slot="start" name="save-outline"></ion-icon>
+            {{ saving() ? 'A guardar...' : 'Guardar' }}
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Cartão de QR Code -->
+  <ion-modal [isOpen]="!!qrMember()" (didDismiss)="qrMember.set(null)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>QR Code</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="qrMember.set(null)">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding qr-modal" *ngIf="qrMember() as qr">
+        <div class="qr-card">
+          <img [src]="qr.image" [alt]="'QR Code de ' + qr.member.full_name" />
+          <h2>{{ qr.member.full_name }}</h2>
+          <p>{{ qr.member.category_name }}<span *ngIf="qr.member.department"> · {{ qr.member.department }}</span></p>
+          <p class="code">{{ qr.member.internal_code }}</p>
+        </div>
+
+        <ion-button expand="block" fill="outline" (click)="printQrCode()">
+          <ion-icon slot="start" name="print-outline"></ion-icon>
+          Imprimir cartão
+        </ion-button>
+        <ion-button expand="block" fill="outline" (click)="downloadQrCode()">
+          <ion-icon slot="start" name="download-outline"></ion-icon>
+          Guardar imagem
+        </ion-button>
+        <ion-button
+          expand="block"
+          fill="clear"
+          color="danger"
+          *ngIf="auth.isAdmin()"
+          (click)="regenerateQrCode(qr.member)">
+          Emitir novo QR Code (invalida o actual)
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>

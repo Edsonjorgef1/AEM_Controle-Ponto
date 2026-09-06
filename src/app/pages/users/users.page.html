@@ -1,0 +1,113 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Contas de acesso</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="load()" aria-label="Actualizar">
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="users-content">
+  <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-card class="legend">
+    <ion-card-content>
+      <p><strong>Administrador</strong> — gere pessoas, contas, horários e vê todos os relatórios.</p>
+      <p><strong>Gestor</strong> — consulta registos e relatórios, sem alterar dados.</p>
+      <p><strong>Operador</strong> — apenas o leitor de QR Code, para o posto de entrada.</p>
+    </ion-card-content>
+  </ion-card>
+
+  <div class="skeletons" *ngIf="loading() && !users().length">
+    <ion-skeleton-text animated *ngFor="let i of [1, 2, 3]"></ion-skeleton-text>
+  </div>
+
+  <ion-list lines="full" *ngIf="!loading() || users().length">
+    <ion-item-sliding *ngFor="let u of users(); trackBy: trackById">
+      <ion-item [class.inactive]="!u.active">
+        <ion-label>
+          <h2>{{ u.name }} <ion-note *ngIf="isSelf(u)">(você)</ion-note></h2>
+          <p>{{ u.email }}</p>
+          <p>
+            <ion-badge [color]="roleColor(u.role)">{{ roleLabels[u.role] }}</ion-badge>
+            <span *ngIf="u.last_login_at"> · último acesso {{ u.last_login_at | date: 'dd/MM/yyyy HH:mm' }}</span>
+            <span *ngIf="!u.last_login_at"> · nunca acedeu</span>
+          </p>
+          <p class="inactive-tag" *ngIf="!u.active">Conta desactivada</p>
+        </ion-label>
+
+        <ion-buttons slot="end">
+          <ion-button (click)="openEdit(u)" aria-label="Editar">
+            <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-item>
+
+      <ion-item-options side="end" *ngIf="!isSelf(u)">
+        <ion-item-option color="medium" (click)="toggleActive(u)">
+          {{ u.active ? 'Desactivar' : 'Activar' }}
+        </ion-item-option>
+        <ion-item-option color="danger" (click)="confirmDelete(u)">
+          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
+  </ion-list>
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button (click)="openCreate()" aria-label="Criar conta">
+      <ion-icon name="add-outline"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+  <ion-modal [isOpen]="formOpen()" (didDismiss)="formOpen.set(false)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editing() ? 'Editar conta' : 'Nova conta' }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="formOpen.set(false)">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding">
+        <ion-list lines="full">
+          <ion-item>
+            <ion-input label="Nome *" labelPlacement="stacked" [(ngModel)]="form.name"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Email *" labelPlacement="stacked" type="email" [(ngModel)]="form.email"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              [label]="editing() ? 'Nova palavra-passe (deixe vazio para manter)' : 'Palavra-passe *'"
+              labelPlacement="stacked"
+              type="password"
+              [(ngModel)]="form.password">
+            </ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-select label="Perfil *" labelPlacement="stacked" [(ngModel)]="form.role" interface="action-sheet">
+              <ion-select-option *ngFor="let r of roles" [value]="r">{{ roleLabels[r] }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-list>
+
+        <ion-button expand="block" [disabled]="saving()" (click)="save()">
+          <ion-icon slot="start" name="save-outline"></ion-icon>
+          {{ saving() ? 'A guardar...' : 'Guardar' }}
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>

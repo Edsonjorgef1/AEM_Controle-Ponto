@@ -1,3 +1,44 @@
-:host {
-  display: block;
+.settings-content {
+  --background: var(--ion-color-light);
+}
+
+.schedule-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+
+  ion-icon {
+    color: var(--ion-color-primary);
+  }
+}
+
+.days {
+  margin: 6px 0 12px;
+  font-size: 0.82rem;
+  color: var(--ion-color-medium);
+}
+
+.empty {
+  color: var(--ion-color-medium);
+  font-size: 0.86rem;
+}
+
+.section-title {
+  margin: 18px 4px 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.days-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--ion-color-medium);
+  margin: 14px 4px;
 }

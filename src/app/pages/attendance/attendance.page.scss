@@ -1,3 +1,60 @@
-:host {
-  display: block;
+.attendance-content {
+  --background: var(--ion-color-light);
+}
+
+.filter-card {
+  margin: 12px;
+}
+
+.quick-range {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.range-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.skeletons {
+  padding: 12px;
+
+  ion-skeleton-text {
+    height: 62px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+}
+
+.code {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.notes {
+  font-style: italic;
+  color: var(--ion-color-medium);
+}
+
+.times {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.78rem;
+  font-family: ui-monospace, monospace;
+}
+
+.empty {
+  color: var(--ion-color-medium);
+  font-size: 0.88rem;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+  margin: 0 4px 12px;
 }

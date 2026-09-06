@@ -1,0 +1,93 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Ler QR Code</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="toggleManual()" [attr.aria-label]="'Introduzir código manualmente'">
+        <ion-icon slot="icon-only" name="keypad-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="scan-content">
+  <div class="reader-shell">
+    <div id="qr-reader" class="reader" [class.hidden]="!scanning()"></div>
+
+    <div class="reader-placeholder" *ngIf="!scanning()">
+      <ion-spinner *ngIf="starting()" name="crescent"></ion-spinner>
+      <ng-container *ngIf="!starting()">
+        <ion-icon name="camera-outline"></ion-icon>
+        <p>{{ cameraError() ?? 'Câmara parada' }}</p>
+        <ion-button size="small" (click)="start()">Ligar câmara</ion-button>
+      </ng-container>
+    </div>
+
+    <div class="processing-overlay" *ngIf="processing()">
+      <ion-spinner name="crescent" color="light"></ion-spinner>
+    </div>
+  </div>
+
+  <div class="controls">
+    <ion-button fill="outline" size="small" *ngIf="scanning()" (click)="stop()">
+      <ion-icon slot="start" name="stop-circle-outline"></ion-icon>
+      Parar
+    </ion-button>
+    <ion-button fill="outline" size="small" (click)="toggleManual()">
+      <ion-icon slot="start" name="keypad-outline"></ion-icon>
+      {{ manualMode() ? 'Fechar teclado' : 'Código manual' }}
+    </ion-button>
+  </div>
+
+  <ion-card class="manual-card" *ngIf="manualMode()">
+    <ion-card-content>
+      <ion-item lines="none">
+        <ion-input
+          label="Código interno ou do QR Code"
+          labelPlacement="stacked"
+          placeholder="FUN0001"
+          [(ngModel)]="manualCode"
+          (keyup.enter)="submitManual()">
+        </ion-input>
+      </ion-item>
+      <ion-button expand="block" [disabled]="!manualCode.trim() || processing()" (click)="submitManual()">
+        Registar ponto
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card
+    class="feedback-card"
+    *ngIf="feedback() as fb"
+    [class.entrada]="fb.kind === 'entrada'"
+    [class.saida]="fb.kind === 'saida'"
+    [class.erro]="fb.kind === 'erro'">
+    <ion-card-content>
+      <ion-icon
+        [name]="fb.kind === 'erro' ? 'close-circle' : (fb.kind === 'entrada' ? 'log-in-outline' : 'log-out-outline')">
+      </ion-icon>
+      <div class="text">
+        <h2>{{ fb.title }}</h2>
+        <p>{{ fb.detail }}</p>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-list *ngIf="history().length > 1" lines="full" class="history">
+    <ion-list-header>Leituras desta sessão</ion-list-header>
+    <ion-item *ngFor="let item of history(); trackBy: trackByTime">
+      <ion-icon
+        slot="start"
+        [color]="item.kind === 'erro' ? 'danger' : (item.kind === 'entrada' ? 'success' : 'tertiary')"
+        [name]="item.kind === 'erro' ? 'close-circle' : 'checkmark-circle'">
+      </ion-icon>
+      <ion-label>
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.detail }}</p>
+      </ion-label>
+      <ion-note slot="end">{{ item.at | date: 'HH:mm' }}</ion-note>
+    </ion-item>
+  </ion-list>
+</ion-content>

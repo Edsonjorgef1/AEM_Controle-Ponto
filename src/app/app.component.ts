@@ -1,52 +1,72 @@
-import { Component, OnInit } from '@angular/core';
-import { IonicModule } from '@ionic/angular';
+import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AuthService } from './services/auth.service';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule } from '@angular/router';
+import { IonicModule } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import {
+  barChartOutline, calendarNumberOutline, documentTextOutline, gridOutline,
+  logOutOutline, peopleOutline, personCircleOutline, qrCodeOutline, settingsOutline,
+} from 'ionicons/icons';
+import { AuthService } from './core/auth.service';
+
+interface MenuLink {
+  title: string;
+  url: string;
+  icon: string;
+}
 
 @Component({
   selector: 'app-root',
-  templateUrl: 'app.component.html',
-  styleUrls: ['app.component.scss'],
   standalone: true,
-  imports: [CommonModule, RouterModule, IonicModule]
+  imports: [CommonModule, RouterModule, IonicModule],
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss'],
 })
-export class AppComponent implements OnInit {
-  isAuthenticated = false;
-  userEmail: string = '';
-  userAvatar: string | null = null;
+export class AppComponent {
+  readonly auth = inject(AuthService);
 
-  constructor(
-    private authService: AuthService,
-    private router: Router  // Add Router injection
-  ) {}
+  /** O menu mostra apenas o que o perfil da sessão pode abrir. */
+  readonly links = computed<MenuLink[]>(() => {
+    const role = this.auth.role();
+    if (!role) return [];
 
-  ngOnInit() {
-    this.loadUserProfile();
-  }
+    const scan: MenuLink = { title: 'Ler QR Code', url: '/scan', icon: 'qr-code-outline' };
+    if (role === 'operador') return [scan];
 
-  async loadUserProfile() {
-    const user = await this.authService.getCurrentUser();
-    if (user) {
-      this.userEmail = user.email || '';
-      this.userAvatar = user.user_metadata ? user.user_metadata['avatar_url'] : null;
+    const shared: MenuLink[] = [
+      { title: 'Painel', url: '/dashboard', icon: 'grid-outline' },
+      scan,
+      { title: 'Pessoas registadas', url: '/membros', icon: 'people-outline' },
+      { title: 'Registos de ponto', url: '/registos', icon: 'calendar-number-outline' },
+      { title: 'Relatórios', url: '/relatorios', icon: 'bar-chart-outline' },
+    ];
+
+    return role === 'admin'
+      ? [
+          ...shared,
+          { title: 'Contas de acesso', url: '/utilizadores', icon: 'person-circle-outline' },
+          { title: 'Configurações', url: '/configuracoes', icon: 'settings-outline' },
+        ]
+      : shared;
+  });
+
+  readonly roleLabel = computed(() => {
+    switch (this.auth.role()) {
+      case 'admin': return 'Administrador';
+      case 'gestor': return 'Gestor';
+      case 'operador': return 'Operador';
+      default: return '';
     }
+  });
+
+  constructor() {
+    addIcons({
+      barChartOutline, calendarNumberOutline, documentTextOutline, gridOutline,
+      logOutOutline, peopleOutline, personCircleOutline, qrCodeOutline, settingsOutline,
+    });
   }
 
-  async editProfile() {
-    // Implementar navegação para página de perfil
-    // await this.router.navigate(['/profile']);
-  }
-
-  async logout() {
-    await this.authService.logout();
-  }
-
-  async goToLogin() {
-    try {
-      await this.router.navigate(['/login']);
-    } catch (error) {
-      console.error('Navigation error:', error);
-    }
+  logout(): void {
+    this.auth.logout();
   }
 }

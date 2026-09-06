@@ -1,0 +1,119 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Painel de hoje</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="load()" aria-label="Actualizar">
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="dashboard-content">
+  <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-text color="danger" *ngIf="error()">
+    <p class="page-error">{{ error() }}</p>
+  </ion-text>
+
+  <div class="skeletons" *ngIf="loading() && !data()">
+    <ion-skeleton-text animated *ngFor="let i of [1, 2, 3, 4]"></ion-skeleton-text>
+  </div>
+
+  <ng-container *ngIf="data() as d">
+    <p class="date-line">{{ d.date | date: 'fullDate' }}</p>
+
+    <div class="stats">
+      <ion-card class="stat">
+        <ion-card-content>
+          <ion-icon name="people-outline" color="primary"></ion-icon>
+          <strong>{{ d.totals.total_members }}</strong>
+          <span>Pessoas activas</span>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat">
+        <ion-card-content>
+          <ion-icon name="walk-outline" color="success"></ion-icon>
+          <strong>{{ d.totals.present }}</strong>
+          <span>Presenças hoje</span>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat">
+        <ion-card-content>
+          <ion-icon name="time-outline" color="warning"></ion-icon>
+          <strong>{{ d.totals.late }}</strong>
+          <span>Com atraso</span>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat">
+        <ion-card-content>
+          <ion-icon name="home-outline" color="tertiary"></ion-icon>
+          <strong>{{ d.totals.inside }}</strong>
+          <span>Ainda nas instalações</span>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat">
+        <ion-card-content>
+          <ion-icon name="alert-circle-outline" color="danger"></ion-icon>
+          <strong>{{ d.totals.absent }}</strong>
+          <span>Sem registo</span>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Por categoria</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="category-row" *ngFor="let c of d.by_category">
+          <div class="head">
+            <ion-badge [color]="c.color">{{ c.name }}</ion-badge>
+            <span>{{ c.present }} / {{ c.total_members }} presentes</span>
+          </div>
+          <ion-progress-bar [color]="c.color" [value]="rate(c.present, c.total_members)"></ion-progress-bar>
+          <p class="detail" *ngIf="c.total_members > 0">
+            {{ c.late }} com atraso · {{ c.inside }} sem saída registada
+          </p>
+          <p class="detail" *ngIf="c.total_members === 0">Sem pessoas registadas nesta categoria</p>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Últimos registos</ion-card-title>
+      </ion-card-header>
+      <ion-list lines="full">
+        <ion-item *ngIf="!d.recent.length">
+          <ion-label class="empty">Ainda não há registos hoje.</ion-label>
+        </ion-item>
+        <ion-item *ngFor="let r of d.recent">
+          <ion-label>
+            <h3>{{ r.full_name }}</h3>
+            <p>
+              {{ r.internal_code }} · {{ r.category_name }}
+              <span *ngIf="r.late_minutes > 0"> · {{ r.late_minutes }} min de atraso</span>
+            </p>
+          </ion-label>
+          <div slot="end" class="times">
+            <ion-note>E {{ r.check_in ? r.check_in.slice(0, 5) : '--:--' }}</ion-note>
+            <ion-note>S {{ r.check_out ? r.check_out.slice(0, 5) : '--:--' }}</ion-note>
+          </div>
+        </ion-item>
+      </ion-list>
+      <ion-card-content>
+        <ion-button fill="clear" size="small" routerLink="/registos">Ver todos os registos</ion-button>
+      </ion-card-content>
+    </ion-card>
+  </ng-container>
+</ion-content>

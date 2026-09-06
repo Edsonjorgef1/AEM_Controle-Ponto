@@ -1,0 +1,118 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Relatórios</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="load()" aria-label="Actualizar">
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="reports-content">
+  <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-card class="filter-card">
+    <ion-card-content>
+      <div class="quick-range">
+        <ion-button size="small" fill="outline" (click)="setMonth(0)">Este mês</ion-button>
+        <ion-button size="small" fill="outline" (click)="setMonth(-1)">Mês passado</ion-button>
+      </div>
+
+      <div class="range-inputs">
+        <ion-item lines="none">
+          <ion-input label="De" labelPlacement="stacked" type="date" [(ngModel)]="from" (ionChange)="load()"></ion-input>
+        </ion-item>
+        <ion-item lines="none">
+          <ion-input label="Até" labelPlacement="stacked" type="date" [(ngModel)]="to" (ionChange)="load()"></ion-input>
+        </ion-item>
+      </div>
+
+      <ion-item lines="none">
+        <ion-select
+          label="Categoria"
+          labelPlacement="stacked"
+          [(ngModel)]="categoryFilter"
+          (ionChange)="load()"
+          interface="popover"
+          placeholder="Todas">
+          <ion-select-option [value]="null">Todas</ion-select-option>
+          <ion-select-option *ngFor="let c of categories()" [value]="c.id">{{ c.name }}</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-button expand="block" fill="outline" [disabled]="exporting()" (click)="exportCsv()">
+        <ion-icon slot="start" name="download-outline"></ion-icon>
+        {{ exporting() ? 'A preparar...' : 'Exportar CSV' }}
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <div class="skeletons" *ngIf="loading() && !report()">
+    <ion-skeleton-text animated *ngFor="let i of [1, 2, 3, 4]"></ion-skeleton-text>
+  </div>
+
+  <ng-container *ngIf="report() as r">
+    <ion-card class="totals-card">
+      <ion-card-header>
+        <ion-card-subtitle>{{ r.period.from }} a {{ r.period.to }}</ion-card-subtitle>
+        <ion-card-title>Resumo geral</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="totals">
+          <div><strong>{{ r.totals.members }}</strong><span>Pessoas</span></div>
+          <div><strong>{{ r.totals.present_days }}</strong><span>Presenças</span></div>
+          <div><strong>{{ r.totals.absent_days }}</strong><span>Faltas</span></div>
+          <div><strong>{{ r.totals.late_days }}</strong><span>Dias com atraso</span></div>
+          <div><strong>{{ r.totals.late_hours }}</strong><span>Atraso acumulado</span></div>
+          <div><strong>{{ r.totals.worked_hours }}</strong><span>Horas trabalhadas</span></div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-list lines="full">
+      <ion-item *ngIf="!r.items.length">
+        <ion-label class="empty">Sem dados para o período seleccionado.</ion-label>
+      </ion-item>
+
+      <ng-container *ngFor="let row of r.items; trackBy: trackByMember">
+        <ion-item button detail="false" (click)="toggle(row.member_id)">
+          <ion-label>
+            <h2>{{ row.full_name }}</h2>
+            <p>
+              <ion-badge [color]="row.category_color">{{ row.category_name }}</ion-badge>
+              <span class="code">{{ row.internal_code }}</span>
+              <span *ngIf="row.department"> · {{ row.department }}</span>
+            </p>
+            <ion-progress-bar
+              [color]="rateColor(row.attendance_rate)"
+              [value]="row.attendance_rate / 100">
+            </ion-progress-bar>
+          </ion-label>
+          <ion-note slot="end" [color]="rateColor(row.attendance_rate)">
+            {{ row.attendance_rate }}%
+          </ion-note>
+        </ion-item>
+
+        <div class="row-detail" *ngIf="expanded() === row.member_id">
+          <div><span>Dias previstos</span><strong>{{ row.expected_days }}</strong></div>
+          <div><span>Presenças</span><strong>{{ row.present_days }}</strong></div>
+          <div><span>Faltas</span><strong>{{ row.absent_days }}</strong></div>
+          <div><span>Justificadas</span><strong>{{ row.justified_days }}</strong></div>
+          <div><span>Dias com atraso</span><strong>{{ row.late_days }}</strong></div>
+          <div><span>Atraso total</span><strong>{{ row.late_hours }}</strong></div>
+          <div><span>Saídas antecipadas</span><strong>{{ row.early_leave_days }}</strong></div>
+          <div><span>Horas trabalhadas</span><strong>{{ row.worked_hours }}</strong></div>
+          <div *ngIf="row.open_days > 0" class="warn">
+            <span>Dias sem saída registada</span><strong>{{ row.open_days }}</strong>
+          </div>
+        </div>
+      </ng-container>
+    </ion-list>
+  </ng-container>
+</ion-content>

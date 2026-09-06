@@ -1,0 +1,87 @@
+.dashboard-content {
+  --background: var(--ion-color-light);
+}
+
+.page-error {
+  margin: 16px;
+  font-size: 0.88rem;
+}
+
+.date-line {
+  margin: 16px 16px 4px;
+  color: var(--ion-color-medium);
+  font-size: 0.85rem;
+  text-transform: capitalize;
+}
+
+.skeletons {
+  padding: 16px;
+
+  ion-skeleton-text {
+    height: 64px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  padding: 0 8px;
+
+  .stat {
+    margin: 4px;
+
+    ion-card-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 14px;
+    }
+
+    ion-icon {
+      font-size: 24px;
+    }
+
+    strong {
+      font-size: 1.7rem;
+      line-height: 1.1;
+    }
+
+    span {
+      font-size: 0.76rem;
+      color: var(--ion-color-medium);
+    }
+  }
+}
+
+.category-row {
+  margin-bottom: 16px;
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+
+  .detail {
+    margin: 6px 0 0;
+    font-size: 0.75rem;
+    color: var(--ion-color-medium);
+  }
+}
+
+.times {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.75rem;
+}
+
+.empty {
+  color: var(--ion-color-medium);
+  font-size: 0.86rem;
+}

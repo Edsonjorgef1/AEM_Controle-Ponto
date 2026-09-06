@@ -1,88 +1,55 @@
-import { Component } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
+import { IonicModule } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { eyeOffOutline, eyeOutline, lockClosedOutline, mailOutline, qrCodeOutline } from 'ionicons/icons';
+import { AuthService } from '../../core/auth.service';
+import { apiErrorMessage } from '../../core/auth.interceptor';
 
 @Component({
   selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, IonicModule],
   templateUrl: './login.page.html',
   styleUrls: ['./login.page.scss'],
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, IonicModule]
 })
 export class LoginPage {
-  loginForm: FormGroup;
-  isLoading = false;
+  private fb = inject(FormBuilder);
+  private auth = inject(AuthService);
+  private router = inject(Router);
 
-  constructor(
-    private formBuilder: FormBuilder,
-    private authService: AuthService,
-    private router: Router,
-    private toastController: ToastController
-  ) {
-    this.loginForm = this.formBuilder.group({
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', Validators.required]
-    });
+  readonly form = this.fb.nonNullable.group({
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required]],
+  });
+
+  readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly showPassword = signal(false);
+
+  constructor() {
+    addIcons({ eyeOffOutline, eyeOutline, lockClosedOutline, mailOutline, qrCodeOutline });
   }
 
-  async onSubmit() {
-    if (this.loginForm.valid) {
-      try {
-        this.isLoading = true;
-        const { email, password } = this.loginForm.value;
-        
-        const error = await this.authService.login(email, password);
-
-        if (error) {
-          let message = 'Email ou senha incorretos';
-          this.showToast(message, 'danger');
-          return;
-        }
-
-        this.showToast('Login realizado com sucesso!', 'success');
-        // Redirecionamento é feito pelo AuthService
-      } catch (error: any) {
-        console.error('Erro no login:', error);
-        this.showToast('Erro ao fazer login', 'danger');
-      } finally {
-        this.isLoading = false;
-      }
+  async submit(): Promise<void> {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
     }
-  }
 
-  async registerAdmin() {
-    this.isLoading = true;
+    this.loading.set(true);
+    this.error.set(null);
     try {
-      const { data, error } = await this.authService.signUp('alexandre@equipmoz.org', '123456');
-      
-      if (error) {
-        console.error('Erro detalhado:', error);
-        this.showToast(error.message || 'Erro ao registrar', 'danger');
-        return;
-      }
-
-      if (data?.user) {
-        this.showToast('Admin registrado! Verifique seu email.', 'success');
-      } else {
-        this.showToast('Erro inesperado no registro', 'danger');
-      }
-    } catch (error: any) {
-      console.error('Erro catch:', error);
-      this.showToast(error.message || 'Erro ao registrar admin', 'danger');
+      const { email, password } = this.form.getRawValue();
+      await this.auth.login(email.trim(), password);
+      // Cada perfil entra directamente no ecrã que lhe interessa.
+      await this.router.navigateByUrl(this.auth.homeRoute(), { replaceUrl: true });
+    } catch (error) {
+      this.error.set(apiErrorMessage(error, 'Não foi possível iniciar sessão'));
     } finally {
-      this.isLoading = false;
+      this.loading.set(false);
     }
-  }
-
-  private async showToast(message: string, color: string) {
-    const toast = await this.toastController.create({
-      message,
-      duration: 2000,
-      color
-    });
-    toast.present();
   }
 }
