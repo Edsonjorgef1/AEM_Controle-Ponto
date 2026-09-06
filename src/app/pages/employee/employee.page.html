@@ -1,58 +1,51 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-title>Cadastro de Funcionários</ion-title>
-  </ion-toolbar>
-</ion-header>
+<app-header
+  title="Cadastro de Funcionários"
+  icon="people-outline"
+  [showMenu]="true"
+  [showThemeToggle]="true"
+  [showNotifications]="false">
+</app-header>
 
 <ion-content class="ion-padding">
-  <form [formGroup]="employeeForm" (ngSubmit)="onSubmit()">
-    <ion-list>
-      <ion-item>
-        <ion-label position="floating">Nome</ion-label>
-        <ion-input type="text" formControlName="name"></ion-input>
+  <div class="add-employee-card app-card">
+    <ion-button expand="block" (click)="openEmployeeFormModal()" class="add-employee-button app-button">
+      <ion-icon name="person-add-outline" slot="start"></ion-icon>
+      Novo Funcionário
+    </ion-button>
+  </div>
+
+  <div class="employees-card app-card">
+    <h2 class="section-title text-heading">
+      <ion-icon name="people-outline" color="primary"></ion-icon>
+      Funcionários Cadastrados
+      <ion-button fill="clear" size="small" (click)="toggleSort()" class="app-button-secondary">
+        <ion-icon [name]="isSortedAsc ? 'arrow-down-outline' : 'arrow-up-outline'"></ion-icon>
+        Ordenar
+      </ion-button>
+    </h2>
+
+    <ion-list class="employee-list">
+      <ion-item *ngFor="let employee of sortedEmployees" button detail="false" (click)="openDetails(employee)" class="employee-item">
+        <ion-avatar slot="start">
+          <ion-icon name="person-circle-outline" class="avatar-icon"></ion-icon>
+        </ion-avatar>
+        <ion-label>
+          <h2>{{ employee.name }}</h2>
+          <p>{{ employee.position }} - {{ employee.department }}</p>
+        </ion-label>
+        <ion-chip slot="end" color="primary" outline>
+          <ion-label>{{ employee.internal_code }}</ion-label>
+        </ion-chip>
       </ion-item>
 
-      <ion-item>
-        <ion-label position="floating">Cargo</ion-label>
-        <ion-input type="text" formControlName="position"></ion-input>
-      </ion-item>
-
-      <ion-item>
-        <ion-label position="floating">Departamento</ion-label>
-        <ion-select formControlName="department">
-          <ion-select-option *ngFor="let dept of departments" [value]="dept">
-            {{ dept }}
-          </ion-select-option>
-        </ion-select>
+      <ion-item *ngIf="employees.length === 0" class="empty-state">
+        <ion-label color="medium" class="ion-text-center">
+          <ion-icon name="alert-circle-outline" class="empty-icon"></ion-icon>
+          <p>Nenhum funcionário cadastrado</p>
+        </ion-label>
       </ion-item>
     </ion-list>
+  </div>
 
-    <ion-button expand="block" type="submit" [disabled]="!employeeForm.valid || isLoading">
-      <ion-icon name="save-outline" slot="start"></ion-icon>
-      Cadastrar
-    </ion-button>
-  </form>
-
-  <ion-list class="ion-margin-top">
-    <ion-list-header>
-      <ion-label>Funcionários Cadastrados</ion-label>
-    </ion-list-header>
-
-    <ion-item *ngFor="let employee of employees">
-      <ion-label>
-        <h2>{{ employee.name }}</h2>
-        <p>{{ employee.position }}</p>
-        <p>Código: {{ employee.internal_code }}</p>
-      </ion-label>
-      <ion-note slot="end" color="medium">{{ employee.department }}</ion-note>
-    </ion-item>
-
-    <ion-item *ngIf="employees.length === 0">
-      <ion-label color="medium" class="ion-text-center">
-        Nenhum funcionário cadastrado
-      </ion-label>
-    </ion-item>
-  </ion-list>
-
-  <ion-loading [isOpen]="isLoading" message="Carregando..."></ion-loading>
+  <!-- <ion-loading [isOpen]="isLoading" message="Carregando..."></ion-loading> -->
 </ion-content>

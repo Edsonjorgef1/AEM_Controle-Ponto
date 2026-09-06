@@ -2,16 +2,20 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { IonicModule, ToastController } from '@ionic/angular';
-import { Employee, Attendance } from '../../models/employee.model';
+import { Employee, Attendance, AttendanceStatus, WorkStatus } from '../../models/employee.model';
 import { EmployeeService } from '../../services/employee.service';
 import { Router } from '@angular/router';
+import { StatusService } from '../../services/status.service';
+import { ThemeToggleComponent } from '../../components/theme-toggle/theme-toggle.component';
+import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { NetworkService } from '../../services/network.service';
 
 @Component({
   selector: 'app-attendance',
   templateUrl: './attendance.page.html',
   styleUrls: ['./attendance.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, IonicModule]
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, IonicModule, ThemeToggleComponent, AppHeaderComponent]
 })
 export class AttendancePage implements OnInit {
   attendanceForm: FormGroup;
@@ -24,7 +28,9 @@ export class AttendancePage implements OnInit {
     private formBuilder: FormBuilder,
     private employeeService: EmployeeService,
     private toastController: ToastController,
-    private router: Router
+    private router: Router,
+    private statusService: StatusService,
+    private networkService: NetworkService
   ) {
     this.attendanceForm = this.formBuilder.group({
       employee_id: ['', Validators.required],
@@ -44,7 +50,7 @@ export class AttendancePage implements OnInit {
   async loadInitialData() {
     this.isLoading = true;
     this.loadError = false;
-    
+
     try {
       await Promise.all([
         this.loadEmployees(),
@@ -67,7 +73,7 @@ export class AttendancePage implements OnInit {
     try {
       this.isLoading = true;
       this.employees = await this.employeeService.getEmployees();
-      
+
       if (this.employees.length === 0) {
         this.showToast('Nenhum funcionário cadastrado. Cadastre funcionários primeiro.', 'warning');
         await this.router.navigate(['/employee']); // Redireciona para página de cadastro
@@ -91,7 +97,7 @@ export class AttendancePage implements OnInit {
         today.getMonth() + 1
       );
 
-      this.todayAttendance = attendanceData.filter(record => 
+      this.todayAttendance = attendanceData.filter(record =>
         new Date(record.date).toDateString() === today.toDateString()
       );
     } catch (error) {
@@ -103,27 +109,50 @@ export class AttendancePage implements OnInit {
   async onSubmit() {
     if (this.attendanceForm.valid) {
       try {
+        this.isLoading = true;
         const formValue = this.attendanceForm.value;
+
         await this.employeeService.registerAttendance(
           formValue.employee_id,
           formValue.auth_method
         );
-        this.showToast('Presença registrada com sucesso', 'success');
+
+        // Verificar se está offline para mostrar mensagem específica
+        const isOffline = !this.networkService.isOnline();
+        if (isOffline) {
+          this.showToast('Presença registrada localmente. Será sincronizada quando houver conexão.', 'success');
+        } else {
+          this.showToast('Presença registrada com sucesso', 'success');
+        }
+
         this.attendanceForm.reset({
           date: new Date().toISOString(),
           status: 'Presente',
           auth_method: 'code'
         });
-        this.loadTodayAttendance();
-      } catch (error) {
-        this.showToast('Erro ao registrar presença', 'danger');
+
+        // Recarregar os dados
+        await this.loadTodayAttendance();
+      } catch (error: any) {
+        console.error('Erro ao registrar presença:', error);
+        // Mostrar mensagem de erro específica se disponível
+        const errorMessage = error.message || 'Erro ao registrar presença';
+        this.showToast(errorMessage, 'danger');
+      } finally {
+        this.isLoading = false;
       }
+    } else {
+      this.showToast('Por favor, preencha todos os campos obrigatórios', 'warning');
     }
   }
 
   getEmployeeName(id: string): string {
     const employee = this.employees.find(emp => emp.id === id);
     return employee ? employee.name : 'Funcionário não encontrado';
+  }
+
+  getStatusColor(status: AttendanceStatus | WorkStatus): string {
+    return this.statusService.getStatusColor(status);
   }
 
   private async showToast(message: string, color: string) {
